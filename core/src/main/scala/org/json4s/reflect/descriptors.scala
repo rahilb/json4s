@@ -80,7 +80,7 @@ object ScalaType {
     override def typeVars: Map[TypeVariable[_], ScalaType] = {
       if (_typeVars == null)
         _typeVars = Map.empty ++
-          erasure.getTypeParameters.map(_.asInstanceOf[TypeVariable[_]]).toList.zip(manifest.typeArguments map (ScalaType(_)))
+          erasure.getTypeParameters.map(_.asInstanceOf[TypeVariable[_]]).zip(typeArgs)
       _typeVars
     }
   }
@@ -99,7 +99,7 @@ class ScalaType(private val manifest: Manifest[_]) extends Equals {
   def typeVars: Map[TypeVariable[_], ScalaType] = {
     if (_typeVars == null)
       _typeVars = Map.empty ++
-        erasure.getTypeParameters.map(_.asInstanceOf[TypeVariable[_]]).toList.zip(manifest.typeArguments map (ScalaType(_)))
+        erasure.getTypeParameters.map(_.asInstanceOf[TypeVariable[_]]).zip(typeArgs)
     _typeVars
   }
 
@@ -206,7 +206,11 @@ case class ClassDescriptor(simpleName: String, fullName: String, erasure: ScalaT
         if (x.isOptional) n+1 else n
       })
     def score(args: List[ConstructorParamDescriptor]) =
-      args.foldLeft(0)((s, arg) => if (names.contains(arg.name)) s+1 else -100)
+      args.foldLeft(0)((s, arg) =>
+        if (names.contains(arg.name)) s+1
+        else if (arg.isOptional) s
+        else -100
+      )
 
     if (constructors.isEmpty) None
     else {
@@ -235,4 +239,3 @@ case class ClassDescriptor(simpleName: String, fullName: String, erasure: ScalaT
 }
 
 case class PrimitiveDescriptor(erasure: ScalaType, default: Option[() => Any] = None) extends ObjectDescriptor
-

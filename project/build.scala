@@ -1,14 +1,11 @@
 import sbt._
 import Keys._
 import xml.Group
-//import sbtscalashim.Plugin._
 import sbtbuildinfo.Plugin._
 import com.typesafe.sbt.SbtStartScript
 
-
 object build extends Build {
   import Dependencies._
-  import Resolvers._
 
   val manifestSetting = packageOptions <+= (name, version, organization) map {
     (title, version, vendor) =>
@@ -28,9 +25,9 @@ object build extends Build {
 
   val publishSetting = publishTo <<= (version) { version: String =>
     if (version.trim.endsWith("SNAPSHOT"))
-      Some(sonatypeNexusSnapshots)
+      Some(Opts.resolver.sonatypeSnapshots)
     else
-      Some(sonatypeNexusStaging)
+      Some(Opts.resolver.sonatypeStaging)
   }
 
   val mavenCentralFrouFrou = Seq(
@@ -52,23 +49,24 @@ object build extends Build {
     )}
   )
 
-  val json4sSettings = Defaults.defaultSettings ++ mavenCentralFrouFrou ++ Seq(
+  val json4sSettings = mavenCentralFrouFrou ++ Seq(
     organization := "org.json4s",
-    scalaVersion := "2.9.3",
-    crossScalaVersions := Seq("2.9.1", "2.9.1-1", "2.9.2", "2.9.3"),
-    scalacOptions ++= Seq("-unchecked", "-deprecation", "-optimize"),
-    version := "3.2.12-SNAPSHOT",
+    scalaVersion := "2.11.5",
+    crossScalaVersions := Seq("2.10.4", "2.11.5"),
+    scalacOptions ++= Seq("-unchecked", "-deprecation", "-optimize", "-feature", "-Yinline-warnings", "-language:existentials", "-language:implicitConversions", "-language:higherKinds", "-language:reflectiveCalls", "-language:postfixOps"),
+    version := "3.3.0-SNAPSHOT",
     javacOptions ++= Seq("-target", "1.6", "-source", "1.6"),
     manifestSetting,
     publishSetting,
-    resolvers ++= Seq( Opts.resolver.sonatypeSnapshots, Opts.resolver.sonatypeReleases)
+    resolvers ++= Seq(Opts.resolver.sonatypeSnapshots, Opts.resolver.sonatypeReleases),
+    crossVersion := CrossVersion.binary
   )
 
   lazy val root = Project(
     id = "json4s",
     base = file("."),
     settings = json4sSettings
-  ) aggregate(core, native, json4sExt, nativeLift, jacksonSupport, scalazExt, json4sTests, mongo, ast)
+  ) aggregate(core, native, json4sExt, jacksonSupport, scalazExt, json4sTests, mongo, ast, scalap)
 
   lazy val ast = Project(
     id = "json4s-ast",
@@ -80,18 +78,23 @@ object build extends Build {
     )
   )
 
+  lazy val scalap = Project(
+    id = "json4s-scalap",
+    base = file("scalap"),
+    settings = json4sSettings
+  )
+
   lazy val core = Project(
     id = "json4s-core",
     base = file("core"),
     settings = json4sSettings ++ Seq(
-      libraryDependencies <++= scalaVersion { sv => Seq(paranamer, scalap(sv)) },
+      libraryDependencies <++= scalaVersion { sv => Seq(paranamer) ++ scalaXml(sv) },
       initialCommands in (Test, console) := """
           |import org.json4s._
           |import reflect._
-          |import scala.tools.scalap.scalax.rules.scalasig._
         """.stripMargin
     )
-  ) dependsOn(ast % "compile;test->test")
+  ) dependsOn(ast % "compile;test->test", scalap)
 
   lazy val native = Project(
     id = "json4s-native",
@@ -105,29 +108,24 @@ object build extends Build {
     settings = json4sSettings ++ Seq(libraryDependencies ++= jodaTime)
   ) dependsOn(native % "provided->compile;test->test")
 
-  lazy val nativeLift = Project(
-    id = "json4s-native-lift",
-    base = file("native-lift"),
-    settings = json4sSettings ++ Seq(libraryDependencies ++= Seq(liftCommon, commonsCodec))
-  )  dependsOn(native % "provided->compile;test->test")
+  // TODO: remove this?
+//  lazy val nativeLift = Project(
+//    id = "json4s-native-lift",
+//    base = file("native-lift"),
+//    settings = json4sSettings ++ Seq(libraryDependencies ++= Seq(liftCommon, commonsCodec))
+//  )  dependsOn(native % "compile;test->test")
 
   lazy val jacksonSupport = Project(
     id = "json4s-jackson",
     base = file("jackson"),
     settings = json4sSettings ++ Seq(libraryDependencies ++= jackson)
   ) dependsOn(core % "compile;test->test")
-//
-//  lazy val playSupport = Project(
-//    id = "json4s-play",
-//    base = file("play"),
-//    settings = json4sSettings ++ Seq(libraryDependencies ++= jackson)
-//  ) dependsOn(core % "compile;test->test")
 
   lazy val examples = Project(
      id = "json4s-examples",
      base = file("examples"),
      settings = json4sSettings ++ SbtStartScript.startScriptForClassesSettings ++ Seq(
-       libraryDependencies += "net.databinder.dispatch" % "dispatch-core_2.9.2" % "0.11.0",
+       libraryDependencies += "net.databinder.dispatch" %% "dispatch-core" % "0.11.0",
        libraryDependencies += jacksonScala
      )
   ) dependsOn(
@@ -137,17 +135,10 @@ object build extends Build {
     json4sExt,
     mongo)
 
-//
-//  lazy val jacksonExt = Project(
-//    id = "json4s-jackson-ext",
-//    base = file("jackson-ext"),
-//    settings = json4sSettings ++ Seq(libraryDependencies ++= jodaTime)
-//  ) dependsOn(jacksonSupport % "compile;test->test")
-//
   lazy val scalazExt = Project(
     id = "json4s-scalaz",
     base = file("scalaz"),
-    settings = json4sSettings ++ Seq(libraryDependencies <+= scalaVersion(scalaz_core))
+    settings = json4sSettings ++ Seq(libraryDependencies += scalaz_core)
   ) dependsOn(core % "compile;test->test", native % "provided->compile", jacksonSupport % "provided->compile")
 
   lazy val mongo = Project(
@@ -155,24 +146,22 @@ object build extends Build {
      base = file("mongo"),
      settings = json4sSettings ++ Seq(
        libraryDependencies ++= Seq(
-         "org.mongodb" % "mongo-java-driver" % "2.11.4"
+         "org.mongodb" % "mongo-java-driver" % "2.12.4"
       )
-     )
-  ) dependsOn(core % "compile;test->test")
+  )) dependsOn(core % "compile;test->test")
 
   lazy val json4sTests = Project(
     id = "json4s-tests",
     base = file("tests"),
     settings = json4sSettings ++ Seq(
-      libraryDependencies <++= scalaVersion { sv => Seq(specs(sv), scalacheck, mockito) },
+      libraryDependencies ++= Seq(specs, scalacheck, mockito),
       initialCommands in (Test, console) :=
         """
           |import org.json4s._
           |import reflect._
-          |import scala.tools.scalap.scalax.rules.scalasig._
         """.stripMargin
     )
-  ) dependsOn(core, native, json4sExt, nativeLift, scalazExt, jacksonSupport, mongo)
+  ) dependsOn(core, native, json4sExt, scalazExt, jacksonSupport, mongo)
 
   lazy val benchmark = Project(
     id = "json4s-benchmark",
@@ -196,6 +185,7 @@ object build extends Build {
 
 }
 
+// TODO: fix some deprecation warnings
 // taken from https://github.com/dcsobral/scala-foreach-benchmark
 class MyRunner(subproject: String, config: ForkScalaRun) extends sbt.ScalaRun {
   def run(mainClass: String, classpath: Seq[File], options: Seq[String], log: Logger): Option[String] = {
@@ -223,4 +213,3 @@ class MyRunner(subproject: String, config: ForkScalaRun) extends sbt.ScalaRun {
     else Some("Nonzero exit code returned from " + label + ": " + exitCode)
   }
 }
-

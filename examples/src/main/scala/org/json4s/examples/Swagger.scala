@@ -78,11 +78,11 @@ object HttpMethod {
 }
 
 case class ListApi(path: String, description: String)
-case class ApiListing(swaggerVersion: String, apiVersion: String, basePath: String, apis: List[ListApi])
+case class ApiListing(swaggerVersion: String, apiVersion: String, apis: List[ListApi])
 
 case class Api(resourcePath: String,
                listingPath: Option[String],
-               description: String,
+               description: Option[String],
                apis: List[Endpoint],
                models: Map[String, Model]) {
   def toJValue = Api.toJValue(this)
@@ -147,16 +147,17 @@ object SwaggerSerializers {
       case JString("Array") =>
         val arrayType = (
           (jv \ "items" \ "type").extractOpt[String] orElse
-          (jv \ "items" \ "$ref").extractOpt[String]).getOrElse(throw new MappingException("Can't get the array type for " + jv))
+          (jv \ "items" \ "$ref").extractOpt[String]).getOrElse(throw new MappingException(s"Can't get the array type for $jv"))
         jv \ "required" match {
           case JBool(true) =>
-            DataType("SET["+arrayType+"]")
+            DataType(s"SET[$arrayType]")
           case JBool(false) =>
-            DataType("LIST["+arrayType+"]")
-          case x => throw new MappingException("Can't deserialize the data type required property for " + x)
+            DataType(s"LIST[$arrayType]")
+          case x => throw new MappingException(s"Can't deserialize the data type required property for $x")
         }
       case JString(x) => DataType(x)
-      case x => throw new MappingException("Can't deserialize data type for " + x)
+      // does not handle a reference yet
+      case x => throw new MappingException(s"Can't deserialize data type for $x")
     }
   }
 
@@ -192,7 +193,7 @@ object SwaggerSerializers {
       implicit val fmts = formats
       ModelField(
         name = (json \ "name").extractOrElse(""),
-        description = (json \ "description").extractOrElse(""),
+        description = (json \ "description").extractOpt[String],
         `type` = deserializeDataType("type", json),
         defaultValue = (json \ "defaultValue").extractOpt[String],
         enum = (json \ "enum" \\ classOf[JString]),
@@ -251,12 +252,12 @@ object DataType {
 
   object GenList {
     def apply(): DataType = List
-    def apply(v: DataType): DataType = new DataType("List[%s]" format (v.name))
+    def apply(v: DataType): DataType = new DataType(s"List[${v.name}]")
   }
 
   object GenMap {
     def apply(): DataType = Map
-    def apply(k: DataType, v: DataType): DataType = new DataType("Map[%s, %s]" format(k.name, v.name))
+    def apply(k: DataType, v: DataType): DataType = new DataType(s"Map[${k.name}, ${v.name}]")
   }
 
   def apply(name: String) = new DataType(name)
@@ -290,7 +291,7 @@ case class Parameter(name: String,
                      allowMultiple: Boolean = false)
 
 case class ModelField(name: String,
-                      description: String,
+                      description: Option[String],
                       `type`: DataType.DataType,
                       defaultValue: Option[String] = None,
                       enum: List[String] = Nil,
@@ -301,7 +302,7 @@ object ModelField {
 }
 
 case class Model(id: String,
-                 description: String,
+                 description: Option[String],
                  properties: Map[String, ModelField]) {
 
   def setRequired(property: String, required: Boolean) =
@@ -322,7 +323,7 @@ case class Operation(httpMethod: HttpMethod,
                      errorResponses: List[Error] = Nil)
 
 case class Endpoint(path: String,
-                    description: String,
+                    description: Option[String],
                     secured: Boolean = false,
                     operations: List[Operation] = Nil)
 

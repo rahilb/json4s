@@ -26,14 +26,15 @@ import scala.util.control.Exception._
 
 object JObjectParserSpec extends Specification  {
 
+  title("JObjectParser Specification")
+
+  sequential
 
   def buildTestData: (ObjectId, DBObject) = {
     val oid = ObjectId.get
     val dbo = JObjectParser.parse(("x" -> oid.toString))(DefaultFormats)
     (oid, dbo)
   }
-
-  sequential
 
   "JObjectParser" should {
     "convert strings to ObjectId by default" in {
@@ -43,7 +44,7 @@ object JObjectParserSpec extends Specification  {
       xval.isDefined must_== true
       xval.toList map { x =>
         x must_== oid
-      }
+      } reduce (_ and _)
     }
     "not convert strings to ObjectId when configured not to" in {
       JObjectParser.stringProcessor.set((s: String) => s)
@@ -54,7 +55,7 @@ object JObjectParserSpec extends Specification  {
       xval.isDefined must_== true
       xval.toList map { x =>
         x must_== oid.toString
-      }
+      } reduce (_ and _)
     }
   }
 }

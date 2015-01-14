@@ -13,28 +13,23 @@ object ValidationExample extends Specification {
 
   "Validation" should {
     def min(x: Int): Int => Result[Int] = (y: Int) =>
-      if (y < x) Fail("min", y + " < " + x) else y.success
+      if (y < x) Fail("min", s"$y < $x") else y.success
 
     def max(x: Int): Int => Result[Int] = (y: Int) =>
-      if (y > x) Fail("max", y + " > " + x) else y.success
+      if (y > x) Fail("max", s"$y > $x") else y.success
 
     val json = native.JsonParser.parse(""" {"name":"joe","age":17} """)
 
     // Note 'apply _' is not needed on Scala 2.8.1 >=
     "fail when age is less than min age" in {
       // Age must be between 18 an 60
-// FIXME enable when 2.8 no longer supported, 2.9 needs: import Validation.Monad._
-//      val person = Person.applyJSON(field("name"), validate[Int]("age") >=> min(18) >=> max(60) apply _)
-//      person(json).fail.toOption.get.list must_== List(UncategorizedError("min", "17 < 18", Nil))
-      pending
+      val person = Person.applyJSON(field[String]("name"), validate[Int]("age") >==> min(18) >==> max(60))
+      person(json) must_== Failure(NonEmptyList(UncategorizedError("min", "17 < 18", Nil)))
     }
 
     "pass when age within limits" in {
-      // Age must be between 16 an 60
-// FIXME enable when 2.8 no longer supported, 2.9 needs: import Validation.Monad._
-//      val person = Person.applyJSON(field("name"), validate[Int]("age") >=> min(16) >=> max(60) apply _)
-//      person(json) must_== Success(Person("joe", 17))
-      pending
+      val person = Person.applyJSON(field[String]("name"), validate[Int]("age") >==> min(16) >==> max(60))
+      person(json) must_== Success(Person("joe", 17))
     }
   }
 

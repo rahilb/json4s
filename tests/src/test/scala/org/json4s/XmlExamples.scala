@@ -63,6 +63,7 @@ abstract class XmlExamples[T](mod: String) extends Specification with JsonMethod
         case JField("numbers", JArray(nums)) => JField("numbers", flattenArray(nums))
       })
 
+
       printer.format(xml(0)) must_== printer.format(
         <lotto>
           <id>5</id>
@@ -80,7 +81,7 @@ abstract class XmlExamples[T](mod: String) extends Specification with JsonMethod
 
     "Band example with namespaces" in {
       val json = toJson(band)
-      json must_== parse("""{
+      json mustEqual parse("""{
     "b:band":{
       "name":"The Fall",
       "genre":"rock",
@@ -97,40 +98,74 @@ abstract class XmlExamples[T](mod: String) extends Specification with JsonMethod
     }
   }""")
     }
-  }
-  val band =
-    <b:band>
-      <name>The Fall</name>
-      <genre>rock</genre>
-      <influence/>
-      <playlists>
-        <playlist name="hits">
-          <song>Hit the north</song>
-          <song>Victoria</song>
-        </playlist>
-        <playlist name="mid 80s">
-          <song>Eat your self fitter</song>
-          <song>My new house</song>
-        </playlist>
-      </playlists>
-    </b:band>
 
-  "Grouped text example" in {
-    val json = toJson(groupedText)
-    compact(render(json)) must_== """{"g":{"group":"foobar","url":"http://example.com/test"}}"""
+    "Grouped text example" in {
+      val json = toJson(groupedText)
+      compact(render(json)) mustEqual """{"g":{"group":"foobar","url":"http://example.com/test"}}"""
+    }
+
+    "Example with multiple attributes, multiple nested elements " in  {
+      val a1 = attrToObject("stats", "count", s => JInt(s.s.toInt)) _
+      val a2 = attrToObject("messages", "href", identity) _
+      val json = a1(a2(toJson(messageXml1)))
+      (json diff parse(expected1)) mustEqual Diff(JNothing, JNothing, JNothing)
+    }
+
+    "Example with one attribute, one nested element " in {
+      val a = attrToObject("stats", "count", s => JInt(s.s.toInt)) _
+      compact(render(a(toJson(messageXml2)))) mustEqual expected2
+      compact(render(a(toJson(messageXml3)))) mustEqual expected2
+
+    }
   }
+
+  val messageXml1 =
+    <message expiry_date="20091126" text="text" word="ant" self="me">
+      <stats count="0"></stats>
+      <messages href="https://domain.com/message/ant"></messages>
+    </message>
+
+  val expected1 = """{"message":{"expiry_date":"20091126","word":"ant","text":"text","self":"me","stats":{"count":0},"messages":{"href":"https://domain.com/message/ant"}}}"""
+
+  val messageXml2 =
+    <message expiry_date="20091126">
+      <stats count="0"></stats>
+    </message>
+
+  val messageXml3 = <message expiry_date="20091126"><stats count="0"></stats></message>
+
+  val expected2 = """{"message":{"expiry_date":"20091126","stats":{"count":0}}}"""
+
+
+  val band =
+        <b:band>
+          <name>The Fall</name>
+          <genre>rock</genre>
+          <influence/>
+          <playlists>
+            <playlist name="hits">
+              <song>Hit the north</song>
+              <song>Victoria</song>
+            </playlist>
+            <playlist name="mid 80s">
+              <song>Eat your self fitter</song>
+              <song>My new house</song>
+            </playlist>
+          </playlists>
+        </b:band>
+
 
   val users1 =
-    <users count="2">
-      <user disabled="true">
-        <id>1</id>
-        <name>Harry</name>
-      </user>
-      <user>
-        <id>2</id>
-        <name nickname="Dave">David</name>
-      </user>
-    </users>
+        <users count="2">
+          <user disabled="true">
+            <id>1</id>
+            <name>Harry</name>
+          </user>
+          <user>
+            <id>2</id>
+            <name nickname="Dave">David</name>
+          </user>
+        </users>
 
   val users2 =
     <users>
@@ -159,33 +194,4 @@ abstract class XmlExamples[T](mod: String) extends Specification with JsonMethod
     case (n, x: JObject) if n == attrName => JField(fieldName, x)
   }
 
-  "Example with multiple attributes, multiple nested elements " in  {
-    val a1 = attrToObject("stats", "count", s => JInt(s.s.toInt)) _
-    val a2 = attrToObject("messages", "href", identity) _
-    val json = a1(a2(toJson(messageXml1)))
-    (json diff parse(expected1)) must_== Diff(JNothing, JNothing, JNothing)
-  }
-
-  "Example with one attribute, one nested element " in {
-    val a = attrToObject("stats", "count", s => JInt(s.s.toInt)) _
-    compact(render(a(toJson(messageXml2)))) must_== expected2
-    compact(render(a(toJson(messageXml3)))) must_== expected2
-  }
-
-  val messageXml1 =
-    <message expiry_date="20091126" text="text" word="ant" self="me">
-      <stats count="0"></stats>
-      <messages href="https://domain.com/message/ant"></messages>
-    </message>
-
-  val expected1 = """{"message":{"expiry_date":"20091126","word":"ant","text":"text","self":"me","stats":{"count":0},"messages":{"href":"https://domain.com/message/ant"}}}"""
-
-  val messageXml2 =
-    <message expiry_date="20091126">
-      <stats count="0"></stats>
-    </message>
-
-  val messageXml3 = <message expiry_date="20091126"><stats count="0"></stats></message>
-
-  val expected2 = """{"message":{"expiry_date":"20091126","stats":{"count":0}}}"""
 }

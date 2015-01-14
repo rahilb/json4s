@@ -18,7 +18,7 @@ object JsonPrintingSpec extends Specification with JValueGen with ScalaCheck {
     prop(rendering)
   }
 
-  private def parse(json: String) = scala.util.parsing.json.JSON.parse(json)
+  private def parse(json: String) = scala.util.parsing.json.JSON.parseFull(json)
 
   implicit def arbDoc: Arbitrary[Document] = Arbitrary(genJValue.map(render(_)))
 }

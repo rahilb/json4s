@@ -223,14 +223,12 @@ object FullTypeHintExamples extends TypeHintExamples {
     read[OptionOfAmbiguousP](ser) must_== o
   }
 
-
   "Default recursive with type hints example" in {
     val pw = PlayerWithBird("zoltan")
     val ser = swrite(pw)
     ser must_== """{"name":"zoltan","bird":{"jsonClass":"org.json4s.Chicken","eggs":3}}"""
     read[PlayerWithBird]("""{"name":"zoltan"}""") must_== pw
   }
-
 }
 
 object CustomTypeHintFieldNameExample extends TypeHintExamples {
@@ -280,7 +278,6 @@ case class Fish(weight: Double) extends Animal
 
 case class Objs(objects: List[Obj[_]])
 case class Obj[A](a: A)
-
 object CustomSerializerExamples extends Specification {
   import native.Serialization.{read, write => swrite}
   import JsonAST._
@@ -307,20 +304,13 @@ object CustomSerializerExamples extends Specification {
     }
   ))
 
-  def losslessUTC = {
-    val sdf = DefaultFormats.losslessDate.get()
-    sdf.setTimeZone(DefaultFormats.UTC)
-    sdf
-  }
-
   class DateSerializer extends CustomSerializer[Date](format => (
     {
       case JObject(List(JField("$dt", JString(s)))) =>
-        losslessUTC.parse(s)
+        format.dateFormat.parse(s).getOrElse(throw new MappingException("Can't parse "+ s + " to Date"))
     },
     {
-      case x: Date =>
-        JObject(JField("$dt", JString(losslessUTC.format(x))) :: Nil)
+      case x: Date => JObject(JField("$dt", JString(format.dateFormat.format(x))) :: Nil)
     }
   ))
 
@@ -330,7 +320,7 @@ object CustomSerializerExamples extends Specification {
         case JArray(xs) =>
           val t = ptype.getOrElse(throw new MappingException("parameterized type not known"))
           xs.map(x => Extraction.extract(x, TypeInfo(t.getActualTypeArguments()(0).asInstanceOf[Class[_]], None))).toIndexedSeq
-        case x => throw new MappingException("Can't convert " + x + " to IndexedSeq")
+        case x => throw new MappingException(s"Can't convert $x to IndexedSeq")
       }
     }
 
@@ -339,30 +329,34 @@ object CustomSerializerExamples extends Specification {
     }
   }
 
-  implicit val formats =  native.Serialization.formats(NoTypeHints) +
-    new IntervalSerializer + new PatternSerializer + new DateSerializer + new IndexedSeqSerializer
+  "Serialize with custom serializers" in {
+    implicit val formats =  native.Serialization.formats(NoTypeHints) +
+      new IntervalSerializer + new PatternSerializer + new DateSerializer + new IndexedSeqSerializer
 
-  val i = new Interval(1, 4)
-  val ser = swrite(i)
-  ser must_== """{"start":1,"end":4}"""
-  val i2 = read[Interval](ser)
-  i2.startTime must_== i.startTime
-  i2.endTime must_== i.endTime
+    val i = new Interval(1, 4)
+    val ser = swrite(i)
+    ser mustEqual """{"start":1,"end":4}"""
+    val i2 = read[Interval](ser)
+    i2.startTime mustEqual i.startTime
+    i2.endTime mustEqual i.endTime
 
-  val pp = Pattern.compile("^Curly")
-  val pser = swrite(pp)
-  pser must_== """{"$pattern":"^Curly"}"""
-  read[Pattern](pser).pattern must_== pp.pattern
+    val pattern = Pattern.compile("^Curly")
+    val pser = swrite(pattern)
+    pser mustEqual """{"$pattern":"^Curly"}"""
+    read[Pattern](pser).pattern mustEqual pattern.pattern
 
-  val d = new Date(0)
-  val dser = swrite(d)
-  dser must_== """{"$dt":"1970-01-01T00:00:00.000Z"}"""
-  read[Date](dser) must_== d
+    val d = new Date(0)
+    val dser = swrite(d)
+    dser mustEqual """{"$dt":"1970-01-01T00:00:00.000Z"}"""
+    read[Date](dser) mustEqual d
 
-  val xs = Indexed(Vector("a", "b", "c"))
-  val iser = swrite(xs)
-  iser must_== """{"xs":["a","b","c"]}"""
-  read[Indexed](iser).xs.toList must_== List("a","b","c")
+    val xs = Indexed(Vector("a", "b", "c"))
+    val iser = swrite(xs)
+    iser mustEqual """{"xs":["a","b","c"]}"""
+    read[Indexed](iser).xs.toList mustEqual List("a","b","c")
+  }
+
+
 }
 
 case class Indexed(xs: IndexedSeq[String])

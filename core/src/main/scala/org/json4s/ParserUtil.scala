@@ -1,10 +1,46 @@
 package org.json4s
 
+import java.nio.charset.Charset
 
 object ParserUtil {
 
   class ParseException(message: String, cause: Exception) extends Exception(message, cause)
   private val EOF = (-1).asInstanceOf[Char]
+  private val AsciiEncoder = Charset.forName("US-ASCII").newEncoder();
+
+  private[this] trait StringAppender[T] {
+    def append(s: String): T
+    def subj: T
+  }
+  private[this] class StringWriterAppender(val subj: java.io.Writer) extends StringAppender[java.io.Writer] {
+    def append(s: String): java.io.Writer = subj.append(s)
+  }
+  private[this] class StringBuilderAppender(val subj: StringBuilder) extends StringAppender[StringBuilder] {
+    def append(s: String): StringBuilder = subj.append(s)
+  }
+
+  def quote(s: String): String = quote(s, new StringBuilderAppender(new StringBuilder)).toString
+  private[json4s] def quote(s: String, writer: java.io.Writer): java.io.Writer = quote(s, new StringWriterAppender(writer))
+  private[this] def quote[T](s: String, appender: StringAppender[T]): T = { // hot path
+    var i = 0
+    val l = s.length
+    while(i < l) {
+      val c = s(i)
+      if (c == '"') appender.append("\\\"")
+      else if (c == '\\') appender.append("\\\\")
+      else if (c == '\b') appender.append("\\b")
+      else if (c == '\f') appender.append("\\f")
+      else if (c == '\n') appender.append("\\n")
+      else if (c == '\r') appender.append("\\r")
+      else if (c == '\t') appender.append("\\t")
+      else if (!AsciiEncoder.canEncode(c))
+        appender.append("\\u%04x".format(c: Int))
+      else appender.append(c.toString)
+      i += 1
+    }
+    appender.subj
+  }
+
   def unquote(string: String): String =
     unquote(new Buffer(new java.io.StringReader(string), false))
 

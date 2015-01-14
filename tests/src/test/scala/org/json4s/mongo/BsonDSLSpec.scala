@@ -32,7 +32,6 @@ import scala.collection.JavaConverters._
 
 object BsonDSLSpec extends Specification  {
 
-
   "BsonDSL" should {
     "Convert ObjectId properly" in {
       val oid: ObjectId = ObjectId.get
@@ -70,10 +69,8 @@ object BsonDSLSpec extends Specification  {
       val dbo: DBObject = JObjectParser.parse(qry)(DefaultFormats)
       val ptrnList2: List[Pattern] = dbo.get("ptrns").asInstanceOf[BasicDBList].asScala.toList.map(_.asInstanceOf[Pattern])
 
-      for (i <- 0 to 2) yield {
-        ptrnList(i).pattern must_== ptrnList2(i).pattern
-        ptrnList(i).flags must_== ptrnList2(i).flags
-      }
+      ptrnList.map(_.pattern) must_== ptrnList2.map(_.pattern)
+      ptrnList.map(_.flags) must_== ptrnList2.map(_.flags)
     }
 
     "Convert Regex properly" in {

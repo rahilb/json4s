@@ -18,10 +18,12 @@ package org.json4s
 package scalaz
 
 import _root_.scalaz._
-import Scalaz._
+import std.option._
+import syntax.validation._
+
 
 trait Types {
-  type Result[A] = ValidationNEL[Error, A]
+  type Result[+A] = ValidationNel[Error, A]
 
   sealed trait Error
   case class UnexpectedJSONError(was: JValue, expected: Class[_ <: JValue]) extends Error
@@ -30,15 +32,14 @@ trait Types {
 
   case object Fail {
     def apply[A](key: String, desc: String, args: List[Any]): Result[A] = 
-      UncategorizedError(key, desc, args).fail.liftFailNel
+      UncategorizedError(key, desc, args).failureNel
 
     def apply[A](key: String, desc: String): Result[A] = 
-      UncategorizedError(key, desc, Nil).fail.liftFailNel
+      UncategorizedError(key, desc, Nil).failureNel
   }
 
-  implicit def JValueZero: Zero[JValue] = zero(JNothing)
-  implicit def JValueSemigroup: Semigroup[JValue] = semigroup(_ ++ _)
-  implicit def JValueEqual: Equal[JValue] = equalA
+  implicit def JValueMonoid: Monoid[JValue] = Monoid.instance(_ ++ _, JNothing)
+  implicit def JValueEqual: Equal[JValue] = Equal.equalA
 
   trait JSONR[A] {
     def read(json: JValue): Result[A]
@@ -62,14 +63,17 @@ trait Types {
       fs.find(_._1 == name)
         .map(f => implicitly[JSONR[A]].read(f._2))
         .orElse(implicitly[JSONR[A]].read(JNothing).fold(_ => none, x => some(Success(x))))
-        .getOrElse(NoSuchFieldError(name, json).fail.liftFailNel)
-    case x => UnexpectedJSONError(x, classOf[JObject]).fail.liftFailNel
+        .getOrElse(NoSuchFieldError(name, json).failureNel)
+    case x => UnexpectedJSONError(x, classOf[JObject]).failureNel
   }
 
-  def validate[A: JSONR](name: String): Kleisli[Result, JValue, A] = kleisli(field[A](name))
+  type EitherNel[+a] = NonEmptyList[Error] \/ a
+  def validate[A: JSONR](name: String) = Kleisli(field[A](name)).mapK[EitherNel, A](_.disjunction)
+  implicit def function2EitherNel[A](f: A => Result[A]): (A => EitherNel[A]) = (a: A) => f(a).disjunction
+  implicit def kleisli2Result[A](v: Kleisli[EitherNel, JValue, A]): JValue => Result[A] = (v.run _).andThen(_.validation)
 
   def makeObj(fields: Traversable[(String, JValue)]): JObject = 
     JObject(fields.toList.map { case (n, v) => JField(n, v) })
 }
 
-object JsonScalaz extends Types with Lifting with Base with Tuples
+object JsonScalaz extends Types with Lifting with Base with org.json4s.scalaz.Tuples

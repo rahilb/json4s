@@ -1,7 +1,7 @@
 package org.json4s
 package jackson
 
-import com.fasterxml.jackson.databind.{ObjectMapper, DeserializationFeature}
+import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper, DeserializationFeature}
 import util.control.Exception.allCatch
 
 trait JsonMethods extends org.json4s.JsonMethods[JValue] {
@@ -14,6 +14,7 @@ trait JsonMethods extends org.json4s.JsonMethods[JValue] {
   def mapper = _defaultMapper
 
   def parse(in: JsonInput, useBigDecimalForDouble: Boolean = false): JValue = {
+    // What about side effects?
     mapper.configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, useBigDecimalForDouble)
     in match {
 	    case StringInput(s) => mapper.readValue(s, classOf[JValue])
@@ -27,7 +28,8 @@ trait JsonMethods extends org.json4s.JsonMethods[JValue] {
     parse(in, useBigDecimalForDouble)
   }
 
-  def render(value: JValue): JValue = value
+  def render(value: JValue)(implicit formats: Formats = DefaultFormats): JValue =
+    formats.emptyValueStrategy.replaceEmpty(value)
 
   def compact(d: JValue): String = mapper.writeValueAsString(d)
 
@@ -39,6 +41,10 @@ trait JsonMethods extends org.json4s.JsonMethods[JValue] {
 
   def asJValue[T](obj: T)(implicit writer: Writer[T]): JValue = writer.write(obj)
   def fromJValue[T](json: JValue)(implicit reader: Reader[T]): T = reader.read(json)
+
+  def asJsonNode(jv: JValue): JsonNode = mapper.valueToTree[JsonNode](jv)
+  def fromJsonNode(jn: JsonNode): JValue = mapper.treeToValue[JValue](jn, classOf[JValue])
+
 }
 
 object JsonMethods extends JsonMethods

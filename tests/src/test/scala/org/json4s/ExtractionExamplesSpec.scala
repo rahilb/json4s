@@ -20,6 +20,7 @@ import java.util.Date
 import org.specs2.mutable.Specification
 import java.text.SimpleDateFormat
 import text.Document
+import scala.None
 
 object NativeExtractionExamples extends ExtractionExamples[Document]("Native") with native.JsonMethods
 object JacksonExtractionExamples extends ExtractionExamples[JValue]("Jackson") with jackson.JsonMethods
@@ -27,6 +28,11 @@ object JacksonExtractionExamples extends ExtractionExamples[JValue]("Jackson") w
 abstract class ExtractionExamples[T](mod: String) extends Specification with JsonMethods[T] {
 
   implicit lazy val formats = DefaultFormats
+
+  val notNullFormats = new DefaultFormats {
+    override val allowNull = false
+  }
+
   (mod+" Extraction Examples Specification") should {
     "Extraction example" in {
       val json = parse(testJson)
@@ -58,7 +64,7 @@ abstract class ExtractionExamples[T](mod: String) extends Specification with Jso
       val json = parse(twoAddresses)
       json.extract[PersonWithAddresses] must_==
         PersonWithAddresses("joe", Map("address1" -> Address("Bulevard", "Helsinki"),
-                                       "address2" -> Address("Soho", "London")))
+          "address2" -> Address("Soho", "London")))
     }
 
     "Mutable map extraction example" in {
@@ -230,14 +236,22 @@ abstract class ExtractionExamples[T](mod: String) extends Specification with Jso
       parse("""{"a":[{"b":"c"}]}""").extract[Map[String, List[Map[String, String]]]] must_== Map("a" -> List(Map("b" -> "c")))
     }
 
-    "Optional field extraction should throw a MappingException when noneForInvalidOptions is set to false" in {
-      val formatsWithOptionValidation = formats.withOptionParseExceptionsThrown
-      parse("""{"date":"Not a date"}""").extract[DateBox](formatsWithOptionValidation, Manifest.classType(classOf[DateBox])) must throwA(MappingException("No usable value for date\nInvalid date 'Not a date'", null))
+    "allowNull format set to false should disallow null values in extraction for class types" in {
+      parse("""{"name":"foobar","address":null}""").extract[SimplePerson](notNullFormats, Manifest.classType(classOf[SimplePerson])) must throwA(MappingException("No usable value for address\nDid not find value which can be converted into org.json4s.Address", null))
     }
+
+    "allowNull format set to false should disallow null values in extraction for primitive types" in {
+      parse("""{"name":null}""").extract[Name](notNullFormats, Manifest.classType(classOf[Name])) must throwA(MappingException("No usable value for name\nDid not find value which can be converted into java.lang.String", null))
+    }
+
+    "allowNull format set to false should extract a null Option[T] as None" in {
+      parse("""{"name":null,"age":22}""").extract[OChild](notNullFormats, Manifest.classType(classOf[OChild])) must_== new OChild(None, 22, None, None)
+    }
+
   }
 
   val testJson =
-"""
+    """
 { "name": "joe",
   "address": {
     "street": "Bulevard",
@@ -255,7 +269,7 @@ abstract class ExtractionExamples[T](mod: String) extends Specification with Jso
     }
   ]
 }
-"""
+    """
 
   val maryChildJson =
     """
@@ -267,7 +281,7 @@ abstract class ExtractionExamples[T](mod: String) extends Specification with Jso
     """.stripMargin
 
   val missingChildren =
-"""
+    """
 {
   "name": "joe",
   "address": {
@@ -275,10 +289,10 @@ abstract class ExtractionExamples[T](mod: String) extends Specification with Jso
     "city": "Helsinki"
   }
 }
-"""
+    """
 
   val twoAddresses =
-"""
+    """
 {
   "name": "joe",
   "addresses": {
@@ -292,10 +306,10 @@ abstract class ExtractionExamples[T](mod: String) extends Specification with Jso
     }
   }
 }
-"""
+    """
 
   val primitives =
-"""
+    """
 {
   "l": 123,
   "i": 124,
@@ -307,33 +321,33 @@ abstract class ExtractionExamples[T](mod: String) extends Specification with Jso
   "bool": true,
   "sym":"symb"
 }
-"""
+    """
 
   val multiDimensionalArrays =
-"""
+    """
 {
   "ints": [[[1, 2], [3]], [[4], [5, 6]]],
   "names": [[{"name": "joe"}, {"name": "mary"}], [[{"name": "mazy"}]]]
 }
-"""
+    """
 
   val stringField =
-"""
+    """
 {
   "name": "one",
   "message": "msg"
 }
-"""
+    """
 
   val objField =
-"""
+    """
 {
   "name": "one",
   "message": {
     "yes": "woo"
   }
 }
-"""
+    """
 
   def date(s: String) = DefaultFormats.dateFormat.parse(s).get
 }
@@ -368,5 +382,3 @@ case class MultipleConstructors(name: String, age: Int, size: Option[String]) {
 }
 
 case class ClassWithJSON(name: String, message: JValue)
-
-case class DateBox(date: Option[Date])

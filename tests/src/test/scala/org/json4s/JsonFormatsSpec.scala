@@ -4,16 +4,16 @@ package org.json4s
 import org.specs2.mutable.Specification
 import text.Document
 
-object NativeJsonFormatsSpec extends JsonFormatsSpec[Document]("Native") with native.JsonMethods
-object JacksonJsonFormatsSpec extends JsonFormatsSpec[JValue]("Jackson") with jackson.JsonMethods
+class NativeJsonFormatsSpec extends JsonFormatsSpec[Document]("Native") with native.JsonMethods
+class JacksonJsonFormatsSpec extends JsonFormatsSpec[JValue]("Jackson") with jackson.JsonMethods
 /**
 * System under specification for JSON Formats.
 */
 abstract class JsonFormatsSpec[T](mod: String) extends Specification with TypeHintExamples with JsonMethods[T] {
   implicit val formats = ShortTypeHintExamples.formats + FullTypeHintExamples.formats.typeHints
 
-  val hintsForFish   = ShortTypeHintExamples.formats.typeHints.hintFor(classOf[Fish])
-  val hintsForDog    = ShortTypeHintExamples.formats.typeHints.hintFor(classOf[Dog])
+  val hintsForFish   = FullTypeHintExamples.formats.typeHints.hintFor(classOf[Fish])
+  val hintsForDog    = FullTypeHintExamples.formats.typeHints.hintFor(classOf[Dog])
   val hintsForAnimal = FullTypeHintExamples.formats.typeHints.hintFor(classOf[Animal])
 
   (mod+" JsonFormats Specification") should {
@@ -24,8 +24,8 @@ abstract class JsonFormatsSpec[T](mod: String) extends Specification with TypeHi
     }
 
     "classFor across composite formats" in {
-      formats.typeHints.classFor(hintsForFish)   must_== (ShortTypeHintExamples.formats.typeHints.classFor(hintsForFish))
-      formats.typeHints.classFor(hintsForDog)    must_== (ShortTypeHintExamples.formats.typeHints.classFor(hintsForDog))
+      formats.typeHints.classFor(hintsForFish)   must_== (FullTypeHintExamples.formats.typeHints.classFor(hintsForFish))
+      formats.typeHints.classFor(hintsForDog)    must_== (FullTypeHintExamples.formats.typeHints.classFor(hintsForDog))
       formats.typeHints.classFor(hintsForAnimal) must_== (FullTypeHintExamples.formats.typeHints.classFor(hintsForAnimal))
     }
 

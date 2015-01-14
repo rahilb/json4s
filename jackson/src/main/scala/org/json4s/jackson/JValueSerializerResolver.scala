@@ -10,4 +10,5 @@ private object JValueSerializerResolver extends Serializers.Base {
     if (!JVALUE.isAssignableFrom(theType.getRawClass)) null
     else new JValueSerializer
   }
+
 }

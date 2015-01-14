@@ -54,7 +54,23 @@ abstract class XmlBugs[T](mod: String) extends Specification with JsonMethods[T]
           <n id="10" x="abc" />
           <n id="11" x="bcd" />
         </root>
-      val expected = """{"root":{"n":[{"x":"abc","id":"10"},{"x":"bcd","id":"11"}]}}"""
+//<<<<<<< HEAD
+//      val expected = if (BuildInfo.scalaVersion.startsWith("2.10"))
+//        """{"root":{"n":[{"id":"10","x":"abc"},{"id":"11","x":"bcd"}]}}"""
+//      else
+//        """{"root":{"n":[{"x":"abc","id":"10"},{"x":"bcd","id":"11"}]}}"""
+//      compact(render(toJson(xml))) must_== expected
+//    }
+//
+//    "XML with empty node is converted correctly to JSON" in {
+//      val xml =
+//        <tips><group type="Foo"></group><group type="Bar"><tip><text>xxx</text></tip><tip><text>yyy</text></tip></group></tips>
+//      val expected = """{"tips":{"group":[{"type":"Foo"},{"type":"Bar","tip":[{"text":"xxx"},{"text":"yyy"}]}]}}"""
+//      compact(render(toJson(xml))) must_== expected
+//    }
+//
+//=======
+      val expected = """{"root":{"n":[{"id":"10","x":"abc"},{"id":"11","x":"bcd"}]}}"""
       compact(render(toJson(xml))) must_== expected
     }
 
